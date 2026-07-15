@@ -1,6 +1,6 @@
 """Tests for ExactSvmScheme client."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from solders.hash import Hash
 from solders.keypair import Keypair
@@ -107,22 +107,22 @@ class TestMintMetadataCache:
             Hash.from_string(FIXED_BLOCKHASH_ALT),
         ]
 
-        def get_latest_blockhash():
+        async def get_latest_blockhash():
             mock_resp = MagicMock()
             mock_resp.value.blockhash = blockhashes.pop(0)
             return mock_resp
 
-        mock_client.get_latest_blockhash.side_effect = get_latest_blockhash
+        mock_client.get_latest_blockhash = AsyncMock(side_effect=get_latest_blockhash)
 
         mock_account_info = MagicMock()
         mock_account_info.value = MagicMock()
         mock_account_info.value.owner = Pubkey.from_string(TOKEN_PROGRAM_ADDRESS)
         mock_account_info.value.data = bytes(44) + bytes([6]) + bytes(37)
-        mock_client.get_account_info.return_value = mock_account_info
+        mock_client.get_account_info = AsyncMock(return_value=mock_account_info)
 
         return mock_client
 
-    def test_v2_reuses_cached_mint_metadata(self):
+    async def test_v2_reuses_cached_mint_metadata(self):
         """V2 should fetch mint metadata once for repeated same-network same-mint payments."""
         signer = KeypairSigner(Keypair.from_seed(bytes([1] * 32)))
         fee_payer = Keypair.from_seed(bytes([2] * 32))
@@ -142,13 +142,13 @@ class TestMintMetadataCache:
         )
 
         with patch.object(client, "_get_client", return_value=rpc_client):
-            client.create_payment_payload(requirements)
-            client.create_payment_payload(requirements)
+            await client.create_payment_payload(requirements)
+            await client.create_payment_payload(requirements)
 
         assert rpc_client.get_account_info.call_count == 1
         assert rpc_client.get_latest_blockhash.call_count == 2
 
-    def test_v1_reuses_cached_mint_metadata(self):
+    async def test_v1_reuses_cached_mint_metadata(self):
         """V1 should fetch mint metadata once for repeated same-network same-mint payments."""
         signer = KeypairSigner(Keypair.from_seed(bytes([1] * 32)))
         fee_payer = Keypair.from_seed(bytes([2] * 32))
@@ -169,8 +169,8 @@ class TestMintMetadataCache:
         )
 
         with patch.object(client, "_get_client", return_value=rpc_client):
-            client.create_payment_payload(requirements)
-            client.create_payment_payload(requirements)
+            await client.create_payment_payload(requirements)
+            await client.create_payment_payload(requirements)
 
         assert rpc_client.get_account_info.call_count == 1
         assert rpc_client.get_latest_blockhash.call_count == 2

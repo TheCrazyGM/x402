@@ -6,16 +6,24 @@ import os
 from typing import Any
 
 try:
-    from solana.rpc.api import Client as SolanaClient
+    from solana.rpc.async_api import AsyncClient as SolanaClient
     from solders.instruction import AccountMeta, Instruction
     from solders.message import MessageV0
     from solders.pubkey import Pubkey
     from solders.signature import Signature
     from solders.transaction import VersionedTransaction
-except ImportError as e:
-    raise ImportError(
-        "SVM mechanism requires solana packages. Install with: pip install x402[svm]"
-    ) from e
+except ImportError:
+    try:
+        from solana.rpc.api import Client as SolanaClient  # type: ignore[no-redef]
+        from solders.instruction import AccountMeta, Instruction  # type: ignore[no-redef]
+        from solders.message import MessageV0  # type: ignore[no-redef]
+        from solders.pubkey import Pubkey  # type: ignore[no-redef]
+        from solders.signature import Signature  # type: ignore[no-redef]
+        from solders.transaction import VersionedTransaction  # type: ignore[no-redef]
+    except ImportError as e:
+        raise ImportError(
+            "SVM mechanism requires solana packages. Install with: pip install x402[svm]"
+        ) from e
 
 from ....schemas import PaymentRequirements
 from ..constants import (
@@ -83,7 +91,7 @@ class ExactSvmScheme:
         self._clients[caip2_network] = client
         return client
 
-    def create_payment_payload(
+    async def create_payment_payload(
         self,
         requirements: PaymentRequirements,
     ) -> dict[str, Any]:
@@ -112,7 +120,7 @@ class ExactSvmScheme:
         mint = Pubkey.from_string(requirements.asset)
         payer_pubkey = Pubkey.from_string(self._signer.address)
 
-        mint_metadata = get_cached_mint_metadata(client, network, mint, self._mint_cache)
+        mint_metadata = await get_cached_mint_metadata(client, network, mint, self._mint_cache)
         token_program = mint_metadata.token_program
         decimals = mint_metadata.decimals
 
@@ -175,7 +183,7 @@ class ExactSvmScheme:
         )
 
         # Get latest blockhash
-        blockhash_resp = client.get_latest_blockhash()
+        blockhash_resp = await client.get_latest_blockhash()
         blockhash = blockhash_resp.value.blockhash
 
         # Build message
