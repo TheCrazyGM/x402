@@ -7,6 +7,7 @@ from typing import Any
 
 try:
     from solana.rpc.async_api import AsyncClient as SolanaClient
+    from solders.hash import Hash, ParseHashError
     from solders.instruction import AccountMeta, Instruction
     from solders.message import MessageV0
     from solders.pubkey import Pubkey
@@ -15,6 +16,7 @@ try:
 except ImportError:
     try:
         from solana.rpc.api import Client as SolanaClient  # type: ignore[no-redef]
+        from solders.hash import Hash, ParseHashError  # type: ignore[no-redef]
         from solders.instruction import AccountMeta, Instruction  # type: ignore[no-redef]
         from solders.message import MessageV0  # type: ignore[no-redef]
         from solders.pubkey import Pubkey  # type: ignore[no-redef]
@@ -182,9 +184,17 @@ class ExactSvmScheme:
             data=memo_data,
         )
 
-        # Get latest blockhash
-        blockhash_resp = await client.get_latest_blockhash()
-        blockhash = blockhash_resp.value.blockhash
+        # Use a valid challenge blockhash when supplied; otherwise fetch one from RPC.
+        recent_blockhash = extra.get("recentBlockhash")
+        blockhash = None
+        if isinstance(recent_blockhash, str) and recent_blockhash:
+            try:
+                blockhash = Hash.from_string(recent_blockhash)
+            except ParseHashError:
+                pass
+        if blockhash is None:
+            blockhash_resp = await client.get_latest_blockhash()
+            blockhash = blockhash_resp.value.blockhash
 
         # Build message
         message = MessageV0.try_compile(
